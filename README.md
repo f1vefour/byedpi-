@@ -305,14 +305,17 @@ Brings up a TUN device (default `byedpi0`, 10.231.0.1/24) and captures system tr
 
 Instead of replacing the main default route, two more specific routes are added -- `0.0.0.0/1` and `128.0.0.0/1` via the TUN device -- which together cover the entire address range without touching the original default route. This matters: ciadpi's own outbound connections are bound (`SO_BINDTODEVICE`) to the original uplink, and if the main route had been replaced they'd have nowhere to go.
 
-Each captured TCP connection is wrapped in a socketpair() and goes through the existing desync/relay code unchanged -- meaning all the other parameters (`--split`, `--disorder`, `--fake`, etc.) work exactly the same in this mode as they do normally.
+If the host has an IPv6 default route at startup, the same thing happens for IPv6 -- a v6 address on the same TUN device (default `fd66:6564:7069::1/64`), the same route-splitting trick (`::/1` + `8000::/1` instead of replacing `::/0`), and ciadpi's own IPv6 connections get `SO_BINDTODEVICE`'d to whatever interface actually had the v6 default route, which isn't necessarily the same interface as the v4 uplink. No v6 default route just means v6 capture is skipped -- that traffic takes its normal path, untouched by ciadpi, rather than being an error.
+
+Each captured TCP connection is wrapped in a socketpair() and goes through the existing desync/relay code unchanged -- meaning all the other parameters (`--split`, `--disorder`, `--fake`, etc.) work exactly the same in this mode as they do normally, for both address families.
 
 Limitations:
-- IPv4 only
 - no TCP SACK or out-of-order handling (the server has to resend after the OS's own timeout)
 - on a half-closed connection, if the OS sends a FIN but the relay side never closes, the flow's state can leak (UDP has idle-timeout garbage collection; TCP doesn't yet)
-- assumes a single uplink -- whichever interface held the default route at startup
+- assumes a single uplink per address family -- whichever interface held that family's default route at startup
+- IPv6 extension headers between the main header and TCP/UDP aren't chased -- ordinary traffic is unaffected, but something like IPv6 fragmentation wouldn't get captured
 - not tested under heavy load or with a large number of simultaneous connections
+- the IPv6 side specifically hasn't been tested against real traffic to the same depth as IPv4 -- the packet construction and route/address parsing were verified independently (checksums cross-checked against scapy, byte-for-byte packet comparisons, synthetic /proc/net/ipv6_route parsing), but nothing beats it actually seeing your traffic, so if something looks off, that's the first place to look
 
 `-G` takes no argument of its own -- every other option combines with it exactly as it would in normal SOCKS mode.
 

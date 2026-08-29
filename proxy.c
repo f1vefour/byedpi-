@@ -389,6 +389,15 @@ static int tls_get_addr(
     
 static int remote_sock(union sockaddr_u *dst, int type)
 {
+    #ifdef __linux__
+    /* Captured before map_fix() below, which can rewrite an IPv4 dst
+       into an IPv4-mapped IPv6 one (::ffff:a.b.c.d) whenever params.baddr
+       is the default :: -- dst->sa.sa_family would then read AF_INET6
+       even though the real destination is IPv4, which would pick the
+       wrong uplink interface further down. */
+    sa_family_t real_family = dst->sa.sa_family;
+    #endif
+
     if (params.baddr.sa.sa_family == AF_INET6) {
         map_fix(dst, 6);
     } else {
@@ -408,9 +417,14 @@ static int remote_sock(union sockaddr_u *dst, int type)
        device. Without this, our own outbound connections here would
        get routed right back into the tun fd we're reading -- SO_BINDTODEVICE
        pins them to the real uplink instead, same as a normal VPN client
-       has to do to avoid looping through itself. */
-    if (tun_uplink_ifname[0] && setsockopt(sfd, SOL_SOCKET, SO_BINDTODEVICE,
-            tun_uplink_ifname, strlen(tun_uplink_ifname) + 1)) {
+       has to do to avoid looping through itself. Picks the v4 or v6
+       uplink based on the destination's real family (see above) since
+       the two can genuinely differ, and either one may be unset if that
+       family's default route wasn't found at startup -- in which case
+       we just don't bind, same as when tun mode isn't active at all. */
+    const char *bind_if = (real_family == AF_INET6) ? tun_uplink_ifname6 : tun_uplink_ifname;
+    if (bind_if[0] && setsockopt(sfd, SOL_SOCKET, SO_BINDTODEVICE,
+            bind_if, strlen(bind_if) + 1)) {
         uniperror("setsockopt SO_BINDTODEVICE");
         close(sfd);
         return -1;

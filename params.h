@@ -183,6 +183,12 @@ struct params {
     uint32_t tun_addr;   /* host byte order */
     uint32_t tun_mask;   /* host byte order */
     int tun_mtu;
+
+    /* IPv6 side of the same feature. Only used if the host actually
+       has an IPv6 default route at startup -- v6 capture is skipped
+       entirely otherwise, it's not an error. */
+    struct in6_addr tun_addr6;
+    int tun_prefix6;
     #endif
 };
 
