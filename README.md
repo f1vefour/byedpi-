@@ -5,6 +5,7 @@ Usage example:
 ```
 ciadpi --disorder 1 --auto=torst --tlsrec 1+s
 ciadpi --fake -1 --ttl 8
+sudo ciadpi -G --disorder 1 --auto=torst --tlsrec 1+s
 ```
 
 ------
@@ -312,6 +313,29 @@ Limitations:
 - on a half-closed connection, if the OS sends a FIN but the relay side never closes, the flow's state can leak (UDP has idle-timeout garbage collection; TCP doesn't yet)
 - assumes a single uplink -- whichever interface held the default route at startup
 - not tested under heavy load or with a large number of simultaneous connections
+
+`-G` takes no argument of its own -- every other option combines with it exactly as it would in normal SOCKS mode.
+
+#### Examples:
+```
+sudo ciadpi -G
+```
+Systemwide VPN with no obfuscation, just relaying everything as-is
+
+```
+sudo ciadpi -G --disorder 1 --auto=torst --tlsrec 1+s
+```
+Systemwide VPN using the same obfuscation you'd hand to normal SOCKS/transparent mode
+
+```
+sudo ciadpi -G --fake -1 --md5sig --ttl 8
+```
+Systemwide VPN with the fake+md5sig combination
+
+```
+sudo ciadpi -G --hosts blocked.txt --disorder 1 --auto=none
+```
+Tunnel all system traffic, but only apply obfuscation to domains listed in blocked.txt -- everything else is still relayed through the tunnel, just without the extra processing
 
 ------
 `--auto`, `--hosts`
