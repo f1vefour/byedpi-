@@ -102,6 +102,8 @@ struct eval {
     const char *restore_orig;
     size_t restore_orig_len;
     unsigned int part_sent;
+
+    void *vpn; /* struct vpn_flow*, only set on tun-mode relay-side evals */
 };
 
 struct poolhd {

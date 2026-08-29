@@ -10,6 +10,8 @@
 #include "packets.h"
 #include "error.h"
 #include "conev.h"
+#include "tun.h"
+#include "vpn.h"
 
 #ifndef _WIN32
     #include <arpa/inet.h>
@@ -71,6 +73,9 @@ static const char help_text[] = {
     #endif
     #ifdef __linux__
     "    -E, --transparent         Transparent proxy mode\n"
+    "    -G, --tun                 Systemwide VPN via a native TUN device (no\n"
+    "                              ip/ifconfig/iptables used; routes auto-restored\n"
+    "                              on exit)\n"
     #endif
     "    -c, --max-conn <count>    Connection count limit, default 512\n"
     "    -N, --no-domain           Deny domain resolving\n"
@@ -139,6 +144,7 @@ const struct option options[] = {
     {"port",          1, 0, 'p'},
     #ifdef __linux__
     {"transparent",   0, 0, 'E'},
+    {"tun",           0, 0, 'G'},
     #endif
     {"conn-ip",       1, 0, 'I'},
     {"buf-size",      1, 0, 'b'},
@@ -746,6 +752,9 @@ int parse_args(int argc, char **argv)
         #ifdef __linux__
         case 'E':
             params.mode = MODE_TRANSPARENT;
+            break;
+        case 'G':
+            params.mode |= MODE_TUN;
             break;
         #endif
         

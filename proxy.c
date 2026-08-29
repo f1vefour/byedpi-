@@ -42,6 +42,12 @@
 #endif
 
 
+#ifdef __linux__
+    #include "tun.h"
+    #include "vpn.h"
+#endif
+
+
 int server_fd;
 
 static void on_cancel(int sig) {
@@ -397,6 +403,19 @@ static int remote_sock(union sockaddr_u *dst, int type)
         uniperror("socket");  
         return -1;
     }
+    #ifdef __linux__
+    /* In tun VPN mode the system default route points at our own tun
+       device. Without this, our own outbound connections here would
+       get routed right back into the tun fd we're reading -- SO_BINDTODEVICE
+       pins them to the real uplink instead, same as a normal VPN client
+       has to do to avoid looping through itself. */
+    if (tun_uplink_ifname[0] && setsockopt(sfd, SOL_SOCKET, SO_BINDTODEVICE,
+            tun_uplink_ifname, strlen(tun_uplink_ifname) + 1)) {
+        uniperror("setsockopt SO_BINDTODEVICE");
+        close(sfd);
+        return -1;
+    }
+    #endif
     if (socket_mod(sfd) < 0) {
         close(sfd);
         return -1;
@@ -1026,10 +1045,37 @@ int start_event_loop(int srvfd)
         close(srvfd);
         return -1;
     }
+    #ifdef __linux__
+    int tun_fd = -1;
+    if (params.mode & MODE_TUN) {
+        tun_fd = tun_start();
+        if (tun_fd < 0) {
+            LOG(LOG_E, "tun: setup failed, aborting\n");
+            destroy_pool(pool);
+            close(srvfd);
+            return -1;
+        }
+        if (vpn_init(pool, tun_fd) < 0) {
+            LOG(LOG_E, "vpn: failed to register tun fd\n");
+            tun_stop(tun_fd);
+            destroy_pool(pool);
+            close(srvfd);
+            return -1;
+        }
+    }
+    #endif
     loop_event(pool);
     
     LOG(LOG_S, "exit\n");
     destroy_pool(pool);
+    #ifdef __linux__
+    if (tun_fd >= 0) {
+        /* destroy_pool() already closed the fd as part of the pool's
+           own evals; -1 here tells tun_stop() not to close it again,
+           just undo the routing changes. */
+        tun_stop(-1);
+    }
+    #endif
     return 0;
 }
 

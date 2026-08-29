@@ -45,6 +45,7 @@
 #define MODE_SHADOWSOCKS 16
 #define MODE_RAWTLS 32
 #define MODE_TCP 64
+#define MODE_TUN 128
 #define MODE_SOCKS (MODE_SOCKS4 | MODE_SOCKS5)
 
 #define OUT_SUPPORT (MODE_SOCKS5 | MODE_TCP)
@@ -171,6 +172,18 @@ struct params {
     bool daemonize;
     const char *pid_file;
     int pid_fd;
+
+    #ifdef __linux__
+    /* -G/--tun : systemwide VPN via a native TUN device.
+       No iproute2/ifconfig/iptables binaries are ever exec'd; the
+       device, address and routes are configured with ioctl()/rtnetlink
+       calls made directly by this process, and undone automatically
+       when it exits. */
+    char tun_ifname[16];
+    uint32_t tun_addr;   /* host byte order */
+    uint32_t tun_mask;   /* host byte order */
+    int tun_mtu;
+    #endif
 };
 
 extern struct params params;
