@@ -40,6 +40,12 @@ sudo ciadpi -G --disorder 1 --auto=torst --tlsrec 1+s
 -c, --max-conn <count>
     Maximum number of client connections, default 512
 
+-x, --debug <level>
+    Log verbosity, default 0 (errors only)
+    0: only errors
+    1: also connection-level status (opens/closes, tun setup, new flows in -G mode)
+    2: also per-packet tracing (verbose; mainly useful for debugging -G/--tun)
+
 -I,  --conn-ip <ip>
     Address that outgoing connections will be bound to, default ::
     If an IPv4 address is given, IPv6 requests will be rejected
