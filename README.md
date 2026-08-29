@@ -8,159 +8,169 @@ ciadpi --fake -1 --ttl 8
 ```
 
 ------
-### Описание аргументов
+### Argument descriptions
 ```
 -i, --ip <ip>
-    Прослушиваемый IP, по умолчанию 0.0.0.0
+    Listening IP, default 0.0.0.0
 
 -p, --port <num>
-    Прослушиваемый порт, по умолчанию 1080
+    Listening port, default 1080
 
 -D, --daemon
-    Запуск в режиме демона
-    Поддерживается только в Linux и BSD системах
+    Run in daemon mode
+    Only supported on Linux and BSD systems
 
 -w, --pidfile <filename>
-    Расположение PID-файла
+    Location of the PID file
 
 -E, --transparent
-    Запуск в режиме прозрачного прокси, SOCKS работать не будет
+    Run in transparent proxy mode; SOCKS will not work
+    
+-G, --tun
+    Systemwide VPN mode via a native TUN device (Linux only)
+    Captures all system traffic except ciadpi's own outbound
+    connections (see details below)
+    The TUN device, its IP address, and routes are configured
+    directly via ioctl/rtnetlink, without calling ip/ifconfig/iptables
+    On exit (including via Ctrl+C) the routes are restored
+    automatically
+    Requires root privileges
     
 -c, --max-conn <count>
-    Максимальное количество клиентских подключений, по умолчанию 512
+    Maximum number of client connections, default 512
 
 -I,  --conn-ip <ip>
-    Адрес, к которому будут привязаны исходящие соединения, по умолчанию ::
-    При указании IPv4 адреса запросы на IPv6 будут отклоняться
+    Address that outgoing connections will be bound to, default ::
+    If an IPv4 address is given, IPv6 requests will be rejected
 
 -b, --buf-size <size>
-    Максимальный размер данных, получаемых и отправляемых за один вызов recv/send
-    Размер указывается в байтах, по умолчанию равен 16384
+    Maximum amount of data received/sent per recv/send call
+    Given in bytes, default 16384
 
 -g, --def-ttl <num>
-    Значение TTL для всех исходящий соединений
-    Может быть полезен для обхода обнаружения нестандартного/уменьшенного TTL
+    TTL value for all outgoing connections
+    Can help bypass detection of a non-standard/reduced TTL
 
 -N, --no-domain
-    Отбрасывать запросы, если в качестве адреса указан домен
-    Т.к. резолвинг выполняется синхронно, то он может замедлить или даже заморозить работу
+    Drop requests where the address is given as a domain
+    Since resolving is done synchronously, it can slow down or even freeze the program
 
 -U, --no-udp
-    Не проксировать UDP
+    Don't proxy UDP
     
 -F, --tfo
-    Включает TCP Fast Open
-    Если сервер его поддерживает, то первый пакет будет отправлен сразу вместе с SYN
-    Поддерживается только в Linux (4.11+)
+    Enables TCP Fast Open
+    If the server supports it, the first packet is sent immediately along with the SYN
+    Only supported on Linux (4.11+)
     
 -A, --auto <t,r,s,n>
-    Автоматический режим
-    Если произошло событие, похожее на блокировку или поломку,
-    то будут применены параметры обхода, следующие за данной опцией
-    Возможные события:
-        torst   : Вышло время ожидания или сервер сбросил подключение после первого запроса
-        redirect: HTTP Redirect с Location, домен которого не совпадает с исходящим
-        ssl_err : В ответ на ClientHello не пришел ServerHello или SH содержит некорректный session_id
-        none    : Предыдущая группа пропущена, например из-за ограничения по доменам или протоколам
+    Automatic mode
+    If an event resembling blocking or breakage occurs,
+    the bypass parameters following this option will be applied
+    Possible events:
+        torst   : Timeout expired, or the server reset the connection after the first request
+        redirect: HTTP redirect whose Location domain doesn't match the outgoing one
+        ssl_err : No ServerHello was received in response to the ClientHello, or the SH contains an invalid session_id
+        none    : The previous group was skipped, e.g. due to a domain or protocol restriction
     
 -L, --auto-mode <0-3>
-    0: кешировать IP только если имеется возможность переподключиться
-    1: кешировать IP также в том случае, если:
-        torst - таймаут/соединение сброшено во время обмена пакетами (т.е. уже после первых данных от сервера)
-        ssl_err - совершился лишь один круг обмена данными (запрос-ответ/запрос-ответ-запрос)
-    2: сортировать группы по количеству срабатываний триггера, от меньшего к большему
-    3: 1 и 2 одновременно
+    0: cache the IP only if reconnecting is possible
+    1: also cache the IP if:
+        torst - timeout/connection reset happened during the exchange (i.e. after the first data from the server)
+        ssl_err - only one round of exchange occurred (request-response/request-response-request)
+    2: sort groups by trigger count, ascending
+    3: 1 and 2 together
     
 -u, --cache-ttl <sec>
-    Время жизни значения в кеше, по умолчанию 100800 (28 часов)
+    Lifetime of a cache entry, default 100800 (28 hours)
     
 -y, --cache-dump <file|->
-    Выгрузить кеш в файл или stdout. Формат: <ip> <port> <group index> <time> <host>
+    Dump the cache to a file or stdout. Format: <ip> <port> <group index> <time> <host>
     
 -T, --timeout <sec>
-    Таймаут ожидания первого ответа от сервера в секундах
-    В Linux переводится в миллисекунды, поэтому можно указать дробное число
+    Timeout for the first response from the server, in seconds
+    On Linux this is converted to milliseconds, so a fractional value can be given
     
 -K, --proto <t,h,u,i>
-    Белый список протоколов: tls,http,udp,ipv4
+    Protocol whitelist: tls,http,udp,ipv4
     
 -H, --hosts <file|:string>
-    Ограничить область действия параметров списком доменов
-    Домены должны быть разделены новой строкой или пробелом
+    Restrict the scope of parameters to a list of domains
+    Domains must be separated by a newline or space
     
 -j, --ipset <file|:str>
-    Ограничитель по определенным IP/подсетям
+    Restrict by specific IPs/subnets
     
 -V, --pf <port[-portr]>
-    Ограничитель по портам
+    Restrict by ports
     
 -R, --round <num[-numr]>
-    К каким/какому запросу применять запутывание
-    По умолчанию 1, т.е. к первому запросу
+    Which request(s) to apply obfuscation to
+    Default is 1, i.e. the first request
     
 -s, --split <pos_t>
-    Разбить запрос по указанной позиции
-    Позиция имеет вид offset[:repeats:skip][+flag1[flag2]]
-    Флаги:
-        +s: добавить смещение SNI
-        +h: добавить смещение Host
-        +n: нулевое смещение
-    Дополнительные флаги:
-        +e: конец; +m: середина
-    Примеры: 
-        0+sm - разбить запрос в середине SNI
-        1:3:5 - разбить по позициям 1, 6 и 11
-    Ключ можно указывать несколько раз, чтобы разбить запрос по нескольким позициям
-    Если offset отрицательный и не имеет флагов, то к нему прибавляется размер пакета
+    Split the request at the given position
+    The position has the form offset[:repeats:skip][+flag1[flag2]]
+    Flags:
+        +s: add the SNI offset
+        +h: add the Host offset
+        +n: zero offset
+    Additional flags:
+        +e: end; +m: middle
+    Examples: 
+        0+sm - split the request in the middle of the SNI
+        1:3:5 - split at positions 1, 6, and 11
+    The key can be given multiple times to split the request at several positions
+    If offset is negative and has no flags, the packet size is added to it
     
 -d, --disorder <pos_t>
-    Подобен --split, но части отправляются в обратном порядке
+    Similar to --split, but the parts are sent in reverse order
     
 -o, --oob <pos_t>
-    Подобен --split, но часть отсылается как OOB данные
+    Similar to --split, but a part is sent as OOB data
     
 -q, --disoob <pos_t>
-    Подобен --disorder, но часть отсылается как OOB данные
+    Similar to --disorder, but a part is sent as OOB data
     
 -f, --fake <pos_t>
-    Подобен --disorder, только перед отправкой первого куска отправляется часть поддельного
-    Количество байт отправляемого из фейка равно рамеру разбиваемой части
-    ! На Windows может работать нестабильно
+    Similar to --disorder, but a fake part is sent before the first chunk
+    The number of bytes sent from the fake equals the size of the split part
+    ! May be unstable on Windows
  
 -t, --ttl <num>
-    TTL для поддельного пакета, по умолчанию 8
-    Необходимо подобрать такое значение, чтобы пакет не дошел до сервера, но был обработан DPI
+    TTL for the fake packet, default 8
+    You need to pick a value such that the packet doesn't reach the server but is still processed by the DPI
 
 -S, --md5sig
-    Установить опцию TCP MD5 Signature для фейкового пакета
-    Большинство серверов (в основном на Linux) отбрасывают пакеты с данной опцией
-    Поддерживается только в Linux, может быть выключен в некоторых сборках ядра (< 3.9, Android)
+    Set the TCP MD5 Signature option on the fake packet
+    Most servers (mainly on Linux) drop packets with this option
+    Only supported on Linux, may be disabled in some kernel builds (< 3.9, Android)
 
 -O, --fake-offset <pos_t>
-    Сместить начало фейковых данных
-    Смещения с флагами вычисляются относительно оригинального запроса
+    Shift the start of the fake data
+    Offsets with flags are calculated relative to the original request
        
 -l, --fake-data <file|:str>
-    Указать свои поддельные пакеты
-    Строка может содержать escape символы (\n,\0,\0x10)
+    Specify your own fake packets
+    The string may contain escape characters (\n,\0,\0x10)
 
 -e, --oob-data <char>
-    Байт, отсылаемый вне основного потока, по умолчанию 'a'
-    Можно указать ASCII или escape символ
+    Byte sent outside the main stream, default 'a'
+    Can be given as ASCII or an escape character
     
 -n, --fake-sni <str>
-    Динамично меняет SNI в фейковом пакете
-    Если размер фейка больше размера запроса, то фейк уменьшается (изменяются размеры Padding, ECH или удаляются некоторые расширения)
-    Символ "?" заменяется на случайную латинскую букву, "#" на цифру, "*" на букву или цифру
-    Можно указывать несколько раз, для каждого запроса будет выбираться случайный SNI из указанных
+    Dynamically changes the SNI in the fake packet
+    If the fake is larger than the request, it's shrunk (Padding/ECH sizes are changed or some extensions are removed)
+    "?" is replaced with a random Latin letter, "#" with a digit, "*" with a letter or digit
+    Can be given multiple times; a random SNI from the given ones is chosen for each request
     
 -Q, --fake-tls-mod <flag>
-    rand - заполнить случайными данными поля SessionID, Random и KeyExchange
-    orig - использовать в качестве фейка оригинальный ClientHello
-    msize=n - максимальный размер фейка; отрицательное число уменьшает оригинальный размер на -n байт
+    rand - fill the SessionID, Random, and KeyExchange fields with random data
+    orig - use the original ClientHello as the fake
+    msize=n - maximum fake size; a negative number shrinks the original size by -n bytes
     
 -M, --mod-http <h[,d,r]>
-    Всякие манипуляции с HTTP пакетом, можно комбинировать
+    Various manipulations of the HTTP packet, can be combined
     hcsmix:
         "Host: name" -> "hOsT: name"
     dcsmix:
@@ -169,181 +179,197 @@ ciadpi --fake -1 --ttl 8
         "Host: name" -> "Host:name\t"
 
 -r, --tlsrec <pos_t>
-    Разделить ClientHello на отдельные записи по указанному смещению
-    Можно указывать несколько раз  
+    Split the ClientHello into separate records at the given offset
+    Can be given multiple times  
 
 -m, --tlsminor <ver>
-    Меняет третий байт в TLS записи на указанный
+    Changes the third byte of the TLS record to the given value
     
 -a, --udp-fake <count>
-    Количество фейковых UDP пакетов
+    Number of fake UDP packets
 
 -Y, --drop-sack
-    Игнорировать SACK, вынуждая ядро переотправить уже доставленные пакеты
-    Поддерживается только в Linux
+    Ignore SACK, forcing the kernel to resend packets that were already delivered
+    Only supported on Linux
 ```
 
 ------
-### Подробнее
+### More details
 `--split`
 
-Разбивает запрос на части. Пример на запросе в 30 байт:
-- Параметры: `--split 3 --split 7`
-- Порядок отправки: 1-3, 3-7, 7-30  
+Splits the request into parts. Example with a 30-byte request:
+- Parameters: `--split 3 --split 7`
+- Send order: 1-3, 3-7, 7-30  
 
-Позиции следует указывать в порядке возрастания.  
+Positions should be given in increasing order.  
 
 ------
 `--disorder`
 
-Часть, попадающая под disorder, будет отправлена с TTL=1, т.е. фактически не будет никуда доставлена.
-ОС узнает об этом лишь после отсылки последующей части, когда сервер сообщит о потере с помощью SACK.
-Системе придется отослать предыдущий пакет заново, тем самым нарушив обычный порядок.
-- Параметры: `--disorder 7`
-- Порядок отправки: 7-30, 1-7  
+The part covered by disorder is sent with TTL=1, meaning it's effectively never delivered anywhere.
+The OS only finds out after sending the next part, when the server reports the loss via SACK.
+The system then has to resend the previous packet, breaking the normal order.
+- Parameters: `--disorder 7`
+- Send order: 7-30, 1-7  
 
-Вышесказанное распространяется только на Linux.
-В Windows ретрансмиссия начинается с позиции, с которой начались потери (максимальный ACK, полученный от сервера):
-- Параметры: `--disorder 7`
-- Порядок отправки: 7-30, 1-30
+The above applies to Linux only.
+On Windows, retransmission starts from the position where the loss began (the maximum ACK received from the server):
+- Parameters: `--disorder 7`
+- Send order: 7-30, 1-30
 
-Поэтому желательно использовать ещё и `split`:  
-- Параметры: `--split 7 --disorder 23`
-- Порядок отправки: 1-7, 23-30, 7-30
+So it's a good idea to also use `split`:  
+- Parameters: `--split 7 --disorder 23`
+- Send order: 1-7, 23-30, 7-30
 
-На практике оптимально использовать:  
+In practice it's optimal to use:  
 * Linux: `--disorder 1`
 * Windows: `--split 1+s --disorder 3+s`
 
 ------
 `--fake`
 
-- Параметры: `--fake 7`
-- Порядок отправки: 1-7 фейк, 7-30 оригинал, 1-7 оригинал
+- Parameters: `--fake 7`
+- Send order: 1-7 fake, 7-30 original, 1-7 original
 
-Данные в первой части запроса заменяются на поддельные.  
-Эта часть должна пройти через DPI, но не дойти до сервера.
-А раз часть не дойдет, то ОС отправит ее снова, тем самым изменив порядок подобно `disorder`.
-Для того, чтобы фейк не дошел до сервера, есть опции `ttl` и `md5sig`.  
+The data in the first part of the request is replaced with fake data.  
+This part needs to pass through the DPI but not reach the server.
+Since the part doesn't arrive, the OS will resend it, changing the order the same way `disorder` does.
+The `ttl` and `md5sig` options exist to keep the fake from reaching the server.  
 
-TTL необходимо подбирать такой, чтобы пакет прошел через все DPI, но не дошел до сервера.  
-Для Linux есть md5sig. Он устанавливает опцию TCP MD5 Signature, что не дает пакету быть принятым многими серверами.
-К сожалению, md5sig работает не во всех сборках.  
+TTL needs to be tuned so the packet passes through all DPI but doesn't reach the server.  
+On Linux there's md5sig. It sets the TCP MD5 Signature option, which keeps many servers from accepting the packet.
+Unfortunately, md5sig doesn't work in every build.  
 
-Для Windows есть еще один способ избежать обработки фейка сервером.
-Это комбинирование `fake` с `disorder`:
-- Параметры: `--disorder 1 --fake 7`
-- Порядок отправки: 2-7 фейк, 7-30 оригинал, 1-30 оригинал  
+On Windows there's another way to keep the server from processing the fake.
+This is combining `fake` with `disorder`:
+- Parameters: `--disorder 1 --fake 7`
+- Send order: 2-7 fake, 7-30 original, 1-30 original  
 
-Если поддельный пакет и дойдет до сервера, то он будет перезаписан из-за полной ретрансмисси.  
+Even if the fake packet does reach the server, it will be overwritten by the full retransmission.  
 
-На практике оптимально использовать:  
+In practice it's optimal to use:  
 * Linux: `--fake -1 --md5sig`
 * Windows: `--disorder 1 --fake -1`
 
 ------
 `--oob`
 
-TCP может отсылать данные вне основного потока, используя флаг URG, однако лишь 1 байт в пакете.  
-Все данные в таком пакете будут доставлены приложению, кроме последнего байта, который и является внеканальным:
-- Параметры: `--oob 3`
-- Отправка: 1-4 с флагом URG (1-3 данные запроса + 4-й байт, который будет усечен), 3-30
+TCP can send data outside the main stream using the URG flag, but only 1 byte per packet.  
+All the data in such a packet is delivered to the application except the last byte, which is the out-of-band one:
+- Parameters: `--oob 3`
+- Sent: 1-4 with the URG flag (1-3 request data + byte 4, which will be truncated), 3-30
 
-Этот байт желательно помещать в SNI: `--oob 3+s` 
+It's a good idea to place this byte within the SNI: `--oob 3+s` 
 
 ------
 `--disoob`
 
-Схож с `--disorder`, но часть отправляется с OOB байтом:
-- Параметры: `--disoob 3`
-- Отправка: 3-30, 1-4 с флагом URG (1-3 данные запроса + 4-й байт, который будет усечен)
+Similar to `--disorder`, but the part is sent with an OOB byte:
+- Parameters: `--disoob 3`
+- Sent: 3-30, 1-4 with the URG flag (1-3 request data + byte 4, which will be truncated)
 
-При использовании с `--fake` или `--disorder` можно получить пакет, где OOB байт будет находиться на месте разбиения:
-- Параметры: `--disoob 3 --disorder 7`
-- Отправка: 3-30, 1-8 с флагом URG (1-3 + байт который будет усечен + 4-8)
+Used together with `--fake` or `--disorder`, you can get a packet where the OOB byte sits right at the split point:
+- Parameters: `--disoob 3 --disorder 7`
+- Sent: 3-30, 1-8 with the URG flag (1-3 + the byte that will be truncated + 4-8)
 
 ------
 `--tlsrec`
 
-Одну TLS запись можно разбить на несколько, немного переделав заголовок.  
-На месте разбиения вставляется новый заголовок, увеличивая размер запроса на 5 байт.  
+A single TLS record can be split into several by slightly reworking the header.  
+A new header is inserted at the split point, increasing the request size by 5 bytes.  
 
-Этот заголовок можно поместить в середину SNI, не давая возможность DPI правильно его прочитать: 
+This header can be placed in the middle of the SNI, preventing the DPI from reading it correctly: 
 `--tlsrec 3+s`
 
-Хоть `tlsrec` и `oob` запутывают DPI, они также могут запутать всякие мидлбоксы, которые не поддерживают полноценный стек TCP/TLS.  
-Из-за этого их следует использовать вместе с `--auto`:  
+Although `tlsrec` and `oob` confuse the DPI, they can also confuse various middleboxes that don't support a full TCP/TLS stack.  
+Because of this, they should be used together with `--auto`:  
 `--auto=torst --timeout 3 --tlsrec 3+s`  
-В примере `tlsrec` будет применяться лишь в случаях, когда сброшено подключение или вышел таймаут, т.е. когда, скорее всего, произошла блокировка.  
-Можно наоборот - отменять tlsrec, если сервер сбрасывает подключение или откидывает пакет:  
+In this example, `tlsrec` is only applied if the connection was reset or a timeout expired, i.e. when blocking most likely occurred.  
+Conversely, you can disable tlsrec if the server resets the connection or drops the packet:  
 `--tlsrec 3+s --auto=torst --timeout 3`  
 
 ------
 `-Y, --drop-sack`
 
-Заставляет ядро игнорировать пакеты с расширением TCP SACK.
-Это расширение позволяет подтверждать получение отдельных сегментов данных.
-Если первая часть запроса будет потеряна, а до сервера дойдет лишь вторая, то сервер с помощью этого расширения может уведомить клиента об этом. Тогда клиент, зная, что вторая часть дошла, отправит лишь первую.  
-Зачем игнорировать это расширение? Второй сегмент может быть фейковым. Если он дойдет до сервера, но клиент об этом не узнает, то он попытается переотправить его. Однако этот сегмент будет содержать уже оригинальные данные, которые перезапишут фейковые, тем самым предотвратив поломку протокола.  
-Так как быстрое подтверждение работать не будет, то это сломает `disorder`, а также добавит задержку перед ретрансмиссией (около 200ms).
+Forces the kernel to ignore packets with the TCP SACK extension.
+This extension lets the receiver acknowledge individual data segments.
+If the first part of a request is lost but the second reaches the server, the server can use this extension to notify the client. The client, knowing the second part arrived, then only resends the first.  
+Why ignore this extension? The second segment might be a fake. If it reaches the server but the client doesn't find out, it will try to resend it. But that segment will already contain the original data, overwriting the fake and thereby preventing the protocol from breaking.  
+Since fast acknowledgment won't work, this breaks `disorder`, and also adds a delay before retransmission (around 200ms).
+
+------
+`--tun`
+
+Brings up a TUN device (default `byedpi0`, 10.231.0.1/24) and captures system traffic, acting like an ordinary VPN client but without external dependencies like iproute2 or iptables -- the device is created and routes are configured directly via syscalls.
+
+Instead of replacing the main default route, two more specific routes are added -- `0.0.0.0/1` and `128.0.0.0/1` via the TUN device -- which together cover the entire address range without touching the original default route. This matters: ciadpi's own outbound connections are bound (`SO_BINDTODEVICE`) to the original uplink, and if the main route had been replaced they'd have nowhere to go.
+
+Each captured TCP connection is wrapped in a socketpair() and goes through the existing desync/relay code unchanged -- meaning all the other parameters (`--split`, `--disorder`, `--fake`, etc.) work exactly the same in this mode as they do normally.
+
+Limitations:
+- IPv4 only
+- no TCP SACK or out-of-order handling (the server has to resend after the OS's own timeout)
+- on a half-closed connection, if the OS sends a FIN but the relay side never closes, the flow's state can leak (UDP has idle-timeout garbage collection; TCP doesn't yet)
+- assumes a single uplink -- whichever interface held the default route at startup
+- not tested under heavy load or with a large number of simultaneous connections
 
 ------
 `--auto`, `--hosts`
 
-Параметр `auto` делит опции на группы.
-Для каждого запроса они обходятся слева на право.
-Сначала проверяется триггер, указанный в `auto`, затем `pf`, `ipset`, `proto` и `hosts`.
+The `auto` parameter splits options into groups.
+For each request they are walked through left to right.
+First the trigger given in `auto` is checked, then `pf`, `ipset`, `proto`, and `hosts`.
 
-Можно указывать несколько групп опций, раделяя их данным параметром.  
-Параметры, которые идут ниже `--timeout` в help-тексте, можно вынести в отдельную группу.  
+You can specify several option groups, separating them with this parameter.  
+Parameters that come after `--timeout` in the help text can be moved into a separate group.  
 
-#### Примеры:
+#### Examples:
 ```
 --fake -1 --ttl 10 --auto=ssl_err --fake -1 --ttl 5
 ```
-По умолчанию использовать `fake` с ttl=10, в случае ошибки использовать `fake` с ttl=5
+Use `fake` with ttl=10 by default; on error, use `fake` with ttl=5
 
 ```
 --hosts list.txt --disorder 3 --auto=none
 ```
-Применять запутывание только для доменов из list.txt
+Apply obfuscation only to domains from list.txt
 
 ```
 --hosts list.txt --auto=none --disorder 3
 ```
-Не применять запутывание для доменов из list.txt
+Don't apply obfuscation to domains from list.txt
 
 ```
 --auto=torst --hosts list.txt --disorder 3
 ```
-По умолчанию ничего не делать, использовать disorder при условии, что произошла блокировка и домен входит в list.txt.
+Do nothing by default; use disorder if blocking occurred and the domain is in list.txt.
 
 ```
 --proto=http,tls --disorder 3 --auto=none
 ```
-Запутывать только HTTP и TLS
+Obfuscate only HTTP and TLS
 
 ```
 --proto=http --fake -1 --fake-data=':GET /...' --auto=none --fake -1
 ```
-Переопределить фейковый пакет для HTTP
+Override the fake packet for HTTP
 
 ------
-### Сборка
-Для сборки понадобится: 
-`make`, `gcc/clang` для Linux, `mingw` для Windows  
+### Building
+You'll need: 
+`make`, `gcc/clang` for Linux, `mingw` for Windows  
 
 * Linux: `make`
 * Windows: `make windows CC=x86_64-w64-mingw32-gcc`
 
 ------
-### Docker образ
+### Docker image
 
-Docker образ выкладывается на [DockerHub](https://hub.docker.com/r/hufrea/byedpi).
-Пример конфигурации контейнера можно найти в [dist/docker](dist/docker).
+The Docker image is published on [DockerHub](https://hub.docker.com/r/hufrea/byedpi).
+An example container configuration can be found in [dist/docker](dist/docker).
 
 ------
-### Дополнительная информация о DPI, источники идей  
+### Further reading on DPI, sources of ideas  
 * https://github.com/bol-van/zapret/blob/master/docs/readme.md  
 * https://geneva.cs.umd.edu/papers/geneva_ccs19.pdf  
 * https://habr.com/ru/post/335436  
